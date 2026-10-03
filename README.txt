@@ -49,6 +49,8 @@ Version 1.1.3 adds explicit sync actions: use Sync to phone in the desktop app, 
 
 Version 1.1.4 improves the Windows self-updater by staging the new executable beside the installed app and replacing it only after the running app exits.
 
+Version 1.1.5 removes the barcode from both inventory list screens. Barcode values remain part of item records and can still be used for scanning and item management.
+
 1. Confirm MourtisStareye/InventroyTracker and its Releases are public. Anyone can download release assets from this public repository.
 2. For each release, update desktop/inventory_desktop.py's DESKTOP_VERSION and app/build.gradle.kts's versionName and versionCode. Build the desktop EXE and Android APK, then publish a GitHub Release with a higher version tag, release notes, and both assets named InventoryTracker.exe and app-debug.apk. The APK must use the same Android signing key as the installed app.
 3. The apps check the latest release on launch and offer a newer version for approval. You can also select Check for updates under Settings > Software updates.

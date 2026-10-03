@@ -34,7 +34,7 @@ APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "InventoryTracker"
 DB_PATH = APP_DIR / "inventory.sqlite3"
 FIELDS = ("id", "name", "barcode", "brand", "quantity", "category", "imageUrl", "location", "notes", "price", "expirationDate", "updatedAt", "version", "deleted")
 GITHUB_REPO = "MourtisStareye/InventroyTracker"
-DESKTOP_VERSION = "1.1.4"
+DESKTOP_VERSION = "1.1.5"
 
 
 def _github_latest_release() -> dict:
@@ -485,13 +485,12 @@ class InventoryApp(tk.Tk):
 
         card = tk.Frame(body, bg=self.PANEL, highlightbackground="#e3eae5", highlightthickness=1)
         card.pack(fill="both", expand=True)
-        columns = ("name", "barcode", "category", "location", "quantity", "price")
+        columns = ("name", "category", "location", "quantity", "price")
         self.table = ttk.Treeview(card, columns=columns, show="headings", selectmode="browse")
-        headings = (("name", "ITEM"), ("barcode", "BARCODE"), ("category", "CATEGORY"), ("location", "LOCATION"), ("quantity", "QTY"), ("price", "PRICE"))
+        headings = (("name", "ITEM"), ("category", "CATEGORY"), ("location", "LOCATION"), ("quantity", "QTY"), ("price", "PRICE"))
         for key, title in headings:
             self.table.heading(key, text=title)
         self.table.column("name", width=240, anchor="w")
-        self.table.column("barcode", width=150, anchor="w")
         self.table.column("category", width=140, anchor="w")
         self.table.column("location", width=170, anchor="w")
         self.table.column("quantity", width=70, anchor="center")
@@ -528,7 +527,7 @@ class InventoryApp(tk.Tk):
         self.table.delete(*self.table.get_children())
         for row in rows:
             price = f"${row['price']:.2f}" if row["price"] is not None else "—"
-            self.table.insert("", "end", iid=row["id"], values=(row["name"], row["barcode"] or "—", row["category"] or "—", row["location"] or "—", row["quantity"], price))
+            self.table.insert("", "end", iid=row["id"], values=(row["name"], row["category"] or "—", row["location"] or "—", row["quantity"], price))
         total = sum(int(row["quantity"]) for row in self.store.list_items())
         self.count_label.configure(text=f"{len(self.store.list_items())} items  ·  {total} total units")
 
