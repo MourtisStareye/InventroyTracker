@@ -34,7 +34,7 @@ APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "InventoryTracker"
 DB_PATH = APP_DIR / "inventory.sqlite3"
 FIELDS = ("id", "name", "barcode", "brand", "quantity", "category", "imageUrl", "location", "notes", "price", "expirationDate", "updatedAt", "version", "deleted")
 GITHUB_REPO = "MourtisStareye/InventroyTracker"
-DESKTOP_VERSION = "1.1.0"
+DESKTOP_VERSION = "1.1.1"
 
 
 def _dpapi(data: bytes, protect: bool) -> bytes:
@@ -93,8 +93,23 @@ def _github_latest_release(token: str) -> dict:
     )
     if token:
         request.add_header("Authorization", f"Bearer {token}")
-    with urllib.request.urlopen(request, timeout=20) as response:
-        return json.loads(response.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            raise RuntimeError(
+                "GitHub returned 404. Verify the repository name and token access, and publish a GitHub Release first. "
+                "The updater checks Releases, not ordinary commits."
+            ) from None
+        if error.code == 401:
+            raise RuntimeError("GitHub rejected the token. Replace it with a valid, unexpired fine-grained token with Contents: read access.") from None
+        if error.code == 403:
+            raise RuntimeError("GitHub denied release access. Check the token's repository selection and Contents: read permission, and try again later if rate-limited.") from None
+        raise RuntimeError(f"GitHub release check failed with HTTP {error.code}.") from None
+    except urllib.error.URLError as error:
+        reason = str(getattr(error, "reason", "") or "").strip()
+        raise RuntimeError(f"Could not reach GitHub. Check the internet connection.{(' Details: ' + reason) if reason else ''}") from None
 
 
 def _version_tuple(value: str) -> tuple[int, ...]:
@@ -994,6 +1009,10 @@ class InventoryApp(tk.Tk):
             if manual:
                 messagebox.showerror("Update access unavailable", str(error), parent=self)
             return
+        if not token:
+            if manual:
+                messagebox.showerror("Update access not configured", "Enter and save a fine-grained GitHub token in Settings > Software updates. It needs Contents: read access to the private repository.", parent=self)
+            return
 
         def worker():
             try:
@@ -1005,7 +1024,9 @@ class InventoryApp(tk.Tk):
                 ))
             except Exception as error:
                 if manual:
-                    self.after(0, lambda: messagebox.showerror("Update check failed", f"Could not check the private GitHub release. Confirm the token and repository access.\n\n{error}", parent=self))
+                    detail = str(error).strip() or repr(error).strip() or type(error).__name__
+                    message = f"Could not check the private GitHub release.\n\n{detail}"
+                    self.after(0, lambda message=message: messagebox.showerror("Update check failed", message, parent=self))
         threading.Thread(target=worker, daemon=True).start()
 
     def _show_desktop_update(self, release: dict):

@@ -71,15 +71,27 @@ class GitHubUpdateController(private val context: Context) {
     }
 
     suspend fun checkForUpdate(): GitHubRelease? = withContext(Dispatchers.IO) {
+        val token = savedToken()
+        if (token.isBlank()) {
+            throw IllegalStateException("Enter and save a fine-grained GitHub token in Settings → Software updates. Private repositories require authentication.")
+        }
         val request = Request.Builder()
             .url("https://api.github.com/repos/$repository/releases/latest")
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "InventoryTracker-Android")
-            .apply { savedToken().takeIf(String::isNotBlank)?.let { header("Authorization", "Bearer $it") } }
+            .header("Authorization", "Bearer $token")
             .build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IllegalStateException("GitHub returned HTTP ${response.code}. Check the repository URL and read-only token.")
+            if (!response.isSuccessful) {
+                val message = when (response.code) {
+                    401 -> "GitHub rejected the token. Replace it with a valid, unexpired token that has Contents: read access."
+                    403 -> "GitHub denied release access. Check the token's repository selection and Contents: read permission, or retry later if rate-limited."
+                    404 -> "GitHub returned 404. Verify the repository name and token access, and publish a GitHub Release first. The updater checks Releases, not ordinary commits."
+                    else -> "GitHub release check failed with HTTP ${response.code}."
+                }
+                throw IllegalStateException(message)
+            }
             val json = JSONObject(response.body?.string().orEmpty())
             val tag = json.optString("tag_name")
             val currentName = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()

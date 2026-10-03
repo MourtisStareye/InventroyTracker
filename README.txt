@@ -53,3 +53,6 @@ The desktop and Android apps check the private repository's latest published Git
 
 Private repository updates require network access and a valid, unexpired token with read-only access. If GitHub reports an authorization error, renew the token and save it in both apps. Do not paste a token into release notes, source code, or a shared ZIP.
 
+TOKEN-FREE UPDATE OPTION
+GitHub does not allow anonymous access to private repository releases. To avoid entering a token, publish update releases in a public GitHub repository. The source repository can remain private by using a separate public, releases-only repository, but both apps must be rebuilt with that public repository configured as their update source. Anyone can download APKs and EXEs from a public release.
+
