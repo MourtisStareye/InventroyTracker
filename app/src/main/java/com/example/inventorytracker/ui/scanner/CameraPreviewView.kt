@@ -29,6 +29,7 @@ fun CameraPreviewView(
     modifier: Modifier = Modifier,
     isTorchEnabled: Boolean = false,
     throttleMillis: Long = 1500L,
+    scanMode: BarcodeScanMode = BarcodeScanMode.ALL,
     onBarcodeScanned: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -84,6 +85,7 @@ fun CameraPreviewView(
                                 executor,
                                 BarcodeAnalyzer(
                                     throttleMillis = throttleMillis,
+                                    scanMode = scanMode,
                                     onBarcodeDetected = onBarcodeScanned
                                 )
                             )

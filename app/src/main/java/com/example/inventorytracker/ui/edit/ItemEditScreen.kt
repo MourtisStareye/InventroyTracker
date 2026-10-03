@@ -58,6 +58,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,6 +100,7 @@ private val CommonCategories = listOf(
 @Composable
 fun ItemEditScreen(
     viewModel: ItemEditViewModel,
+    openPhotoPickerOnLaunch: Boolean = false,
     onBackClick: () -> Unit,
     onScanBarcodeClick: () -> Unit,
     onSaved: (itemId: Long) -> Unit,
@@ -166,6 +168,10 @@ fun ItemEditScreen(
     }
 
     val isEditing = viewModel.existingItemId > 0
+
+    LaunchedEffect(openPhotoPickerOnLaunch) {
+        if (openPhotoPickerOnLaunch && !isEditing) photoPicker.launch("image/*")
+    }
 
     if (showDeleteDialog && isEditing) {
         DeleteConfirmationDialog(

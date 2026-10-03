@@ -48,6 +48,7 @@ import com.google.accompanist.permissions.shouldShowRationale
 fun BarcodeScannerScreen(
     modifier: Modifier = Modifier,
     throttleMillis: Long = 1500L,
+    scanMode: BarcodeScanMode = BarcodeScanMode.ALL,
     instructionText: String = "Align UPC/EAN barcode within the frame",
     onBarcodeScanned: (String) -> Unit,
     onClose: () -> Unit
@@ -72,6 +73,7 @@ fun BarcodeScannerScreen(
             CameraPreviewView(
                 isTorchEnabled = isTorchEnabled,
                 throttleMillis = throttleMillis,
+                scanMode = scanMode,
                 onBarcodeScanned = onBarcodeScanned
             )
 

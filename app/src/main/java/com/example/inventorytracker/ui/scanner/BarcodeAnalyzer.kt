@@ -8,6 +8,14 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import kotlinx.serialization.Serializable
+
+@Serializable
+enum class BarcodeScanMode {
+    UPC,
+    QR,
+    ALL
+}
 
 /**
  * ImageAnalysis.Analyzer implementation that uses ML Kit Barcode Scanning
@@ -17,22 +25,33 @@ import com.google.mlkit.vision.common.InputImage
  */
 class BarcodeAnalyzer(
     throttleMillis: Long = 1500L,
+    scanMode: BarcodeScanMode = BarcodeScanMode.ALL,
     private val onBarcodeDetected: (String) -> Unit
 ) : ImageAnalysis.Analyzer {
 
     private val throttler = BarcodeThrottler(throttleMillis)
 
-    private val options = BarcodeScannerOptions.Builder()
-        .setBarcodeFormats(
-            Barcode.FORMAT_UPC_A,
-            Barcode.FORMAT_UPC_E,
-            Barcode.FORMAT_EAN_8,
-            Barcode.FORMAT_EAN_13,
-            Barcode.FORMAT_CODE_128,
-            Barcode.FORMAT_CODE_39,
-            Barcode.FORMAT_QR_CODE
-        )
-        .build()
+    private val options = BarcodeScannerOptions.Builder().apply {
+        val formats = when (scanMode) {
+            BarcodeScanMode.UPC -> intArrayOf(
+                Barcode.FORMAT_UPC_A,
+                Barcode.FORMAT_UPC_E,
+                Barcode.FORMAT_EAN_8,
+                Barcode.FORMAT_EAN_13
+            )
+            BarcodeScanMode.QR -> intArrayOf(Barcode.FORMAT_QR_CODE)
+            BarcodeScanMode.ALL -> intArrayOf(
+                Barcode.FORMAT_UPC_A,
+                Barcode.FORMAT_UPC_E,
+                Barcode.FORMAT_EAN_8,
+                Barcode.FORMAT_EAN_13,
+                Barcode.FORMAT_CODE_128,
+                Barcode.FORMAT_CODE_39,
+                Barcode.FORMAT_QR_CODE
+            )
+        }
+        setBarcodeFormats(formats.first(), *formats.drop(1).toIntArray())
+    }.build()
 
     private val scanner = BarcodeScanning.getClient(options)
 

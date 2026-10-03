@@ -1,13 +1,14 @@
 package com.example.inventorytracker.ui.navigation
 
 import androidx.navigation3.runtime.NavKey
+import com.example.inventorytracker.ui.scanner.BarcodeScanMode
 import kotlinx.serialization.Serializable
 
 @Serializable
 data object InventoryListKey : NavKey
 
 @Serializable
-data object ScannerKey : NavKey
+data class ScannerKey(val mode: BarcodeScanMode = BarcodeScanMode.UPC) : NavKey
 
 @Serializable
 data object SyncSettingsKey : NavKey
@@ -28,5 +29,6 @@ data class ItemEditKey(
     val initialName: String? = null,
     val initialBrand: String? = null,
     val initialCategory: String? = null,
-    val initialImageUrl: String? = null
+    val initialImageUrl: String? = null,
+    val openPhotoPickerOnLaunch: Boolean = false
 ) : NavKey

@@ -24,6 +24,8 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.Inventory2
 import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.QrCode
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
@@ -40,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -71,7 +74,9 @@ fun InventoryListScreen(
     viewModel: InventoryViewModel,
     onItemClick: (itemId: Long) -> Unit,
     onScanClick: () -> Unit,
-    onAddClick: () -> Unit,
+    onScanQrClick: () -> Unit,
+    onAddFromPhotoClick: () -> Unit,
+    onAddManuallyClick: () -> Unit,
     onSyncClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -83,6 +88,7 @@ fun InventoryListScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     var menuExpanded by remember { mutableStateOf(false) }
     var showClearConfirmation by remember { mutableStateOf(false) }
+    var showAddOptions by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
     val refreshScope = rememberCoroutineScope()
 
@@ -159,11 +165,11 @@ fun InventoryListScreen(
                     IconButton(onClick = onScanClick) {
                         Icon(
                             imageVector = Icons.Rounded.QrCodeScanner,
-                            contentDescription = "Scan Barcode",
+                            contentDescription = "Scan UPC",
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }
-                    IconButton(onClick = onAddClick) {
+                    IconButton(onClick = { showAddOptions = true }) {
                         Icon(
                             imageVector = Icons.Rounded.Add,
                             contentDescription = "Add Item",
@@ -185,7 +191,7 @@ fun InventoryListScreen(
                         contentDescription = null
                     )
                 },
-                text = { Text("Scan Barcode") },
+                text = { Text("Scan UPC") },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = CircleShape
@@ -276,7 +282,7 @@ fun InventoryListScreen(
                     searchQuery = searchQuery,
                     selectedCategory = selectedCategory,
                     onScanClick = onScanClick,
-                    onAddClick = onAddClick,
+                    onAddClick = { showAddOptions = true },
                     onClearSearch = {
                         viewModel.updateSearchQuery("")
                         viewModel.selectCategory(null)
@@ -307,6 +313,55 @@ fun InventoryListScreen(
             }
           }
         }
+    }
+
+    if (showAddOptions) {
+        AlertDialog(
+            onDismissRequest = { showAddOptions = false },
+            title = { Text("Add Inventory") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { showAddOptions = false; onScanClick() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.QrCodeScanner, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Scan UPC")
+                    }
+                    OutlinedButton(
+                        onClick = { showAddOptions = false; onScanQrClick() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.QrCode, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Scan QR Code")
+                    }
+                    Text(
+                        "OR",
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Button(
+                        onClick = { showAddOptions = false; onAddFromPhotoClick() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.Image, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add from Photo")
+                    }
+                    OutlinedButton(
+                        onClick = { showAddOptions = false; onAddManuallyClick() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Rounded.Add, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add Manually")
+                    }
+                }
+            },
+            confirmButton = {}
+        )
     }
 
     if (showClearConfirmation) {

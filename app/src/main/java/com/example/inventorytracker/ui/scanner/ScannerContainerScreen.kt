@@ -30,6 +30,7 @@ import com.example.inventorytracker.ui.navigation.ItemEditKey
 @Composable
 fun ScannerContainerScreen(
     viewModel: ScannerViewModel,
+    scanMode: BarcodeScanMode = BarcodeScanMode.UPC,
     onNavigateToDetail: (itemId: Long) -> Unit,
     onNavigateToAddEdit: (ItemEditKey) -> Unit,
     onClose: () -> Unit,
@@ -84,6 +85,8 @@ fun ScannerContainerScreen(
     Box(modifier = modifier.fillMaxSize()) {
         BarcodeScannerScreen(
             throttleMillis = 1500L,
+            scanMode = scanMode,
+            instructionText = if (scanMode == BarcodeScanMode.QR) "Align the QR code within the frame" else "Align UPC/EAN barcode within the frame",
             onBarcodeScanned = { barcode ->
                 if (!isProcessing) {
                     viewModel.onBarcodeScanned(barcode)

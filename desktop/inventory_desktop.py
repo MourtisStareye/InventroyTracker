@@ -34,7 +34,7 @@ APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "InventoryTracker"
 DB_PATH = APP_DIR / "inventory.sqlite3"
 FIELDS = ("id", "name", "barcode", "brand", "quantity", "category", "imageUrl", "location", "notes", "price", "expirationDate", "updatedAt", "version", "deleted")
 GITHUB_REPO = "MourtisStareye/InventroyTracker"
-DESKTOP_VERSION = "1.1.5"
+DESKTOP_VERSION = "1.1.6"
 
 
 def _github_latest_release() -> dict:

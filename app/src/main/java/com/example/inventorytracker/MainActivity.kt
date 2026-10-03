@@ -51,6 +51,7 @@ import com.example.inventorytracker.ui.navigation.AppSettingsKey
 import com.example.inventorytracker.ui.navigation.ItemDetailKey
 import com.example.inventorytracker.ui.navigation.ItemEditKey
 import com.example.inventorytracker.ui.navigation.ScannerKey
+import com.example.inventorytracker.ui.scanner.BarcodeScanMode
 import com.example.inventorytracker.ui.navigation.SyncNowKey
 import com.example.inventorytracker.ui.navigation.SyncSettingsKey
 import com.example.inventorytracker.ui.scanner.ScannerContainerScreen
@@ -155,8 +156,8 @@ fun InventoryAppNav(
                 metadata = ListDetailSceneStrategy.listPane(
                     detailPlaceholder = {
                         EmptyDetailPlaceholder(
-                            onScanClick = { backStack.add(ScannerKey) },
-                            onAddClick = { backStack.add(ItemEditKey()) }
+                            onScanClick = { backStack.add(ScannerKey(BarcodeScanMode.UPC)) },
+                            onAddClick = { backStack.add(ItemEditKey(openPhotoPickerOnLaunch = true)) }
                         )
                     }
                 )
@@ -170,12 +171,10 @@ fun InventoryAppNav(
                     onItemClick = { itemId ->
                         backStack.add(ItemDetailKey(itemId))
                     },
-                    onScanClick = {
-                        backStack.add(ScannerKey)
-                    },
-                    onAddClick = {
-                        backStack.add(ItemEditKey())
-                    },
+                    onScanClick = { backStack.add(ScannerKey(BarcodeScanMode.UPC)) },
+                    onScanQrClick = { backStack.add(ScannerKey(BarcodeScanMode.QR)) },
+                    onAddFromPhotoClick = { backStack.add(ItemEditKey(openPhotoPickerOnLaunch = true)) },
+                    onAddManuallyClick = { backStack.add(ItemEditKey()) },
                     onSyncClick = {
                         backStack.add(SyncNowKey)
                     },
@@ -235,17 +234,18 @@ fun InventoryAppNav(
                 metadata = ListDetailSceneStrategy.detailPane()
             ) { key ->
                 val editViewModel: ItemEditViewModel = viewModel(
-                    key = "ItemEditViewModel_${key.itemId}_${key.initialBarcode}",
+                    key = "ItemEditViewModel_${key.itemId}_${key.initialBarcode}_${key.openPhotoPickerOnLaunch}",
                     factory = ItemEditViewModel.Factory(repository, key)
                 )
 
                 ItemEditScreen(
                     viewModel = editViewModel,
+                    openPhotoPickerOnLaunch = key.openPhotoPickerOnLaunch,
                     onBackClick = {
                         backStack.removeLastOrNull()
                     },
                     onScanBarcodeClick = {
-                        backStack.add(ScannerKey)
+                        backStack.add(ScannerKey(BarcodeScanMode.UPC))
                     },
                     onSaved = { savedItemId ->
                         backStack.removeLastOrNull()
@@ -259,15 +259,14 @@ fun InventoryAppNav(
                 )
             }
 
-            entry<ScannerKey>(
-                metadata = ListDetailSceneStrategy.extraPane()
-            ) {
+            entry<ScannerKey>(metadata = ListDetailSceneStrategy.extraPane()) { key ->
                 val scannerViewModel: ScannerViewModel = viewModel(
                     factory = ScannerViewModel.Factory(repository)
                 )
 
                 ScannerContainerScreen(
                     viewModel = scannerViewModel,
+                    scanMode = key.mode,
                     onNavigateToDetail = { itemId ->
                         backStack.removeLastOrNull()
                         backStack.add(ItemDetailKey(itemId))
