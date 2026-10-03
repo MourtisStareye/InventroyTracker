@@ -245,7 +245,7 @@ private fun SyncRunScreen(
         modifier = modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Sync") },
+                title = { Text("Sync to desktop") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
@@ -261,7 +261,7 @@ private fun SyncRunScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.Top
         ) {
-            Text("Forced database sync", style = MaterialTheme.typography.titleMedium)
+            Text("Sync to desktop", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             Text("Pending local changes: $pending", style = MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(16.dp))

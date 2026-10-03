@@ -45,6 +45,8 @@ SYNC BUTTONS
 SOFTWARE UPDATES FROM GITHUB
 The desktop and Android apps check the public repository's latest published GitHub Release when they start. No token or sign-in is required. They show the version and release notes and wait for your approval before downloading. Android then opens Android's installer, which asks you to approve installation. Desktop closes, replaces its installed EXE, and reopens.
 
+Version 1.1.3 adds explicit sync actions: use Sync to phone in the desktop app, or Sync to desktop in the Android app. Both use the paired connection and exchange pending inventory updates. The desktop also has a Refresh button, and the mobile inventory list supports pull-to-refresh.
+
 1. Confirm MourtisStareye/InventroyTracker and its Releases are public. Anyone can download release assets from this public repository.
 2. For each release, update desktop/inventory_desktop.py's DESKTOP_VERSION and app/build.gradle.kts's versionName and versionCode. Build the desktop EXE and Android APK, then publish a GitHub Release with a higher version tag, release notes, and both assets named InventoryTracker.exe and app-debug.apk. The APK must use the same Android signing key as the installed app.
 3. The apps check the latest release on launch and offer a newer version for approval. You can also select Check for updates under Settings > Software updates.

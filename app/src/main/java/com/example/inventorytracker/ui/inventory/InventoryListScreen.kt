@@ -46,10 +46,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +62,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.inventorytracker.data.local.entity.InventoryItem
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,6 +83,8 @@ fun InventoryListScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     var menuExpanded by remember { mutableStateOf(false) }
     var showClearConfirmation by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val refreshScope = rememberCoroutineScope()
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -94,7 +100,7 @@ fun InventoryListScreen(
                             onDismissRequest = { menuExpanded = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Sync") },
+                                text = { Text("Sync to desktop") },
                                 onClick = {
                                     menuExpanded = false
                                     onSyncClick()
@@ -186,11 +192,19 @@ fun InventoryListScreen(
             )
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                if (!isRefreshing) refreshScope.launch {
+                    isRefreshing = true
+                    viewModel.refreshInventory()
+                    delay(400)
+                    isRefreshing = false
+                }
+            },
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
         ) {
+          Column(modifier = Modifier.fillMaxSize()) {
             // Search Input Field
             Box(
                 modifier = Modifier
@@ -291,6 +305,7 @@ fun InventoryListScreen(
                     }
                 }
             }
+          }
         }
     }
 

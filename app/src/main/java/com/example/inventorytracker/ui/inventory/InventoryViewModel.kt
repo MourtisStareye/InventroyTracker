@@ -23,10 +23,12 @@ class InventoryViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
+    private val refreshKey = MutableStateFlow(0)
+
     private val _selectedCategory = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = _selectedCategory.asStateFlow()
 
-    private val rawItemsFlow = searchQuery.flatMapLatest { query ->
+    private val rawItemsFlow = combine(searchQuery, refreshKey) { query, _ -> query }.flatMapLatest { query ->
         if (query.isBlank()) {
             repository.getAllItems()
         } else {
@@ -63,6 +65,10 @@ class InventoryViewModel(
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
+    }
+
+    fun refreshInventory() {
+        refreshKey.value += 1
     }
 
     fun selectCategory(category: String?) {

@@ -34,7 +34,7 @@ APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "InventoryTracker"
 DB_PATH = APP_DIR / "inventory.sqlite3"
 FIELDS = ("id", "name", "barcode", "brand", "quantity", "category", "imageUrl", "location", "notes", "price", "expirationDate", "updatedAt", "version", "deleted")
 GITHUB_REPO = "MourtisStareye/InventroyTracker"
-DESKTOP_VERSION = "1.1.2"
+DESKTOP_VERSION = "1.1.3"
 
 
 def _github_latest_release() -> dict:
@@ -467,7 +467,8 @@ class InventoryApp(tk.Tk):
         self.count_label.pack(side="left", padx=14, pady=(8, 0))
         self._button(row, "+  Add item", self.add_item, primary=True).pack(side="right")
         self._button(row, "Settings", self.open_settings).pack(side="right", padx=10)
-        self._button(row, "Sync", self.force_sync_database).pack(side="right", padx=10)
+        self._button(row, "Sync to phone", self.force_sync_database).pack(side="right", padx=10)
+        self._button(row, "Refresh", self.refresh_inventory).pack(side="right", padx=10)
 
         body = tk.Frame(self, bg=self.BG, padx=28, pady=20)
         body.pack(fill="both", expand=True)
@@ -530,6 +531,10 @@ class InventoryApp(tk.Tk):
             self.table.insert("", "end", iid=row["id"], values=(row["name"], row["barcode"] or "—", row["category"] or "—", row["location"] or "—", row["quantity"], price))
         total = sum(int(row["quantity"]) for row in self.store.list_items())
         self.count_label.configure(text=f"{len(self.store.list_items())} items  ·  {total} total units")
+
+    def refresh_inventory(self):
+        self.refresh()
+        self.status.configure(text="Inventory refreshed")
 
     def _poll_sync_updates(self):
         sync_received = False
@@ -992,7 +997,7 @@ class InventoryApp(tk.Tk):
     def force_sync_database(self):
         count = self.store.queue_full_sync()
         self.server.request_phone_sync()
-        self.status.configure(text=f"Forced sync queued ({count} records). Keep the paired Android app open for immediate transfer.")
+        self.status.configure(text=f"Sync to phone queued ({count} records). Keep the paired Android app open for immediate transfer.")
 
     def _close(self):
         self.server.stop()
