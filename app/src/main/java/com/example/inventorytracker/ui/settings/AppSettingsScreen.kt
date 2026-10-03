@@ -18,7 +18,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,7 +30,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.example.inventorytracker.data.remote.update.GitHubRelease
 import com.example.inventorytracker.data.remote.update.GitHubUpdateController
@@ -47,7 +45,6 @@ fun AppSettingsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var token by remember { mutableStateOf(updateController.savedToken()) }
     var checking by remember { mutableStateOf(false) }
     var releaseOffer by remember { mutableStateOf<GitHubRelease?>(null) }
     var status by remember { mutableStateOf("") }
@@ -104,39 +101,13 @@ fun AppSettingsScreen(
             Text("Software updates", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
             Text(
-                "Checks the private GitHub Releases repository when the app starts. Updates show the version and release notes and require your approval before downloading.",
+                "Checks the public GitHub Releases repository when the app starts. No token is needed. Updates show the version and release notes and wait for your approval before downloading.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = token,
-                onValueChange = { token = it },
-                label = { Text("Fine-grained GitHub token") },
-                supportingText = { Text("Repository Contents: read only. Encrypted on this device. Blank keeps saved access.") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = {
-                    if (token.isNotBlank()) {
-                        updateController.saveToken(token)
-                        token = ""
-                        status = "GitHub update access saved on this device."
-                    } else status = "No new token entered; saved access was kept."
-                }) { Text("Save access") }
-                Button(onClick = {
-                    updateController.clearToken()
-                    token = ""
-                    status = "Saved GitHub update access was cleared."
-                }) { Text("Clear access") }
-            }
-            Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(enabled = !checking, onClick = {
-                    if (token.isNotBlank()) updateController.saveToken(token)
                     checking = true
                     status = "Checking GitHub Releases…"
                     scope.launch {

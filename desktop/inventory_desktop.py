@@ -34,78 +34,27 @@ APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "InventoryTracker"
 DB_PATH = APP_DIR / "inventory.sqlite3"
 FIELDS = ("id", "name", "barcode", "brand", "quantity", "category", "imageUrl", "location", "notes", "price", "expirationDate", "updatedAt", "version", "deleted")
 GITHUB_REPO = "MourtisStareye/InventroyTracker"
-DESKTOP_VERSION = "1.1.1"
+DESKTOP_VERSION = "1.1.2"
 
 
-def _dpapi(data: bytes, protect: bool) -> bytes:
-    """Protect a secret for the current Windows user using DPAPI."""
-    if os.name != "nt":
-        raise OSError("Secure token storage is available only on Windows.")
-    from ctypes import wintypes
-    class Blob(ctypes.Structure):
-        _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_ubyte))]
-    source = (ctypes.c_ubyte * len(data)).from_buffer_copy(data)
-    in_blob = Blob(len(data), source)
-    out_blob = Blob()
-    crypt = ctypes.WinDLL("crypt32", use_last_error=True)
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    fn = crypt.CryptProtectData if protect else crypt.CryptUnprotectData
-    if protect:
-        fn.argtypes = [ctypes.POINTER(Blob), wintypes.LPCWSTR, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(Blob)]
-        ok = fn(ctypes.byref(in_blob), "Inventory Tracker GitHub token", None, None, None, 1, ctypes.byref(out_blob))
-    else:
-        fn.argtypes = [ctypes.POINTER(Blob), ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(Blob)]
-        ok = fn(ctypes.byref(in_blob), None, None, None, None, 1, ctypes.byref(out_blob))
-    if not ok:
-        raise ctypes.WinError(ctypes.get_last_error())
-    try:
-        return ctypes.string_at(out_blob.pbData, out_blob.cbData)
-    finally:
-        kernel.LocalFree.argtypes = [ctypes.c_void_p]
-        kernel.LocalFree.restype = ctypes.c_void_p
-        kernel.LocalFree(out_blob.pbData)
-
-
-def _github_token_path() -> Path:
-    return APP_DIR / "github-token.dpapi"
-
-
-def _read_github_token() -> str:
-    path = _github_token_path()
-    if not path.exists():
-        return ""
-    return _dpapi(path.read_bytes(), False).decode("utf-8")
-
-
-def _save_github_token(token: str) -> None:
-    APP_DIR.mkdir(parents=True, exist_ok=True)
-    path = _github_token_path()
-    if token:
-        path.write_bytes(_dpapi(token.encode("utf-8"), True))
-    else:
-        path.unlink(missing_ok=True)
-
-
-def _github_latest_release(token: str) -> dict:
+def _github_latest_release() -> dict:
     request = urllib.request.Request(
         f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest",
         headers={"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "InventoryTracker"},
     )
-    if token:
-        request.add_header("Authorization", f"Bearer {token}")
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
         if error.code == 404:
             raise RuntimeError(
-                "GitHub returned 404. Verify the repository name and token access, and publish a GitHub Release first. "
+                "GitHub returned 404. Verify the public repository name and publish a GitHub Release first. "
                 "The updater checks Releases, not ordinary commits."
             ) from None
         if error.code == 401:
-            raise RuntimeError("GitHub rejected the token. Replace it with a valid, unexpired fine-grained token with Contents: read access.") from None
+            raise RuntimeError("GitHub did not allow anonymous release access. Confirm the repository and its Releases are public.") from None
         if error.code == 403:
-            raise RuntimeError("GitHub denied release access. Check the token's repository selection and Contents: read permission, and try again later if rate-limited.") from None
+            raise RuntimeError("GitHub temporarily denied the update check. Check the internet connection and try again later.") from None
         raise RuntimeError(f"GitHub release check failed with HTTP {error.code}.") from None
     except urllib.error.URLError as error:
         reason = str(getattr(error, "reason", "") or "").strip()
@@ -947,36 +896,10 @@ class InventoryApp(tk.Tk):
         update_frame = tk.Frame(dialog, bg="#f4f7f3", padx=16, pady=14)
         update_frame.pack(fill="x", padx=24, pady=10)
         tk.Label(update_frame, text="Software updates", bg="#f4f7f3", fg=self.INK, font=("Segoe UI", 11, "bold")).pack(anchor="w")
-        tk.Label(update_frame, text="Checks the private GitHub Releases feed. Updates are downloaded only after you approve the release.", bg="#f4f7f3", fg=self.MUTED, font=("Segoe UI", 9), wraplength=390, justify="left").pack(anchor="w", pady=(5, 8))
-        token_var = tk.StringVar(value="")
-        token_entry = tk.Entry(update_frame, textvariable=token_var, show="•", width=48, relief="flat")
-        token_entry.pack(fill="x", ipady=7, pady=(0, 5))
-        tk.Label(update_frame, text="Paste a fine-grained GitHub token (Contents: read only). Stored encrypted for this Windows account; a blank field keeps the saved token.", bg="#f4f7f3", fg=self.MUTED, font=("Segoe UI", 8), wraplength=390, justify="left").pack(anchor="w", pady=(0, 8))
-
-        def save_update_token():
-            try:
-                if not token_var.get().strip():
-                    messagebox.showinfo("No new token entered", "The existing saved token was kept. Paste a token to replace it, or use Clear token to remove it.", parent=dialog)
-                    return
-                _save_github_token(token_var.get().strip())
-                token_var.set("")
-                messagebox.showinfo("Update access saved", "The GitHub token was saved securely for this Windows account.", parent=dialog)
-            except Exception as error:
-                messagebox.showerror("Could not save token", str(error), parent=dialog)
-
-        def clear_update_token():
-            try:
-                _save_github_token("")
-                token_var.set("")
-                messagebox.showinfo("Update access cleared", "The saved GitHub token was removed from this Windows account.", parent=dialog)
-            except Exception as error:
-                messagebox.showerror("Could not clear token", str(error), parent=dialog)
-
+        tk.Label(update_frame, text="Checks the public GitHub Releases feed on startup. Updates are downloaded only after you approve the release. No token is needed.", bg="#f4f7f3", fg=self.MUTED, font=("Segoe UI", 9), wraplength=390, justify="left").pack(anchor="w", pady=(5, 8))
         update_buttons = tk.Frame(update_frame, bg="#f4f7f3")
         update_buttons.pack(anchor="w")
-        self._button(update_buttons, "Save token", save_update_token).pack(side="left", padx=(0, 8))
-        self._button(update_buttons, "Check for updates", lambda: (save_update_token() if token_var.get().strip() else None, self._check_desktop_update(manual=True))).pack(side="left")
-        self._button(update_buttons, "Clear token", clear_update_token).pack(side="left", padx=(8, 0))
+        self._button(update_buttons, "Check for updates", lambda: self._check_desktop_update(manual=True)).pack(side="left")
 
         clear_frame = tk.Frame(dialog, bg="#fbf1ef", padx=16, pady=14)
         clear_frame.pack(fill="x", padx=24, pady=10)
@@ -995,28 +918,12 @@ class InventoryApp(tk.Tk):
         self._button(dialog, "Done", dialog.destroy).pack(anchor="e", padx=24, pady=(8, 20))
 
     def _check_desktop_update_on_launch(self):
-        try:
-            if _read_github_token():
-                self._check_desktop_update(manual=False)
-        except Exception:
-            return
+        self._check_desktop_update(manual=False)
 
     def _check_desktop_update(self, manual: bool):
-        token = ""
-        try:
-            token = _read_github_token()
-        except Exception as error:
-            if manual:
-                messagebox.showerror("Update access unavailable", str(error), parent=self)
-            return
-        if not token:
-            if manual:
-                messagebox.showerror("Update access not configured", "Enter and save a fine-grained GitHub token in Settings > Software updates. It needs Contents: read access to the private repository.", parent=self)
-            return
-
         def worker():
             try:
-                release = _github_latest_release(token)
+                release = _github_latest_release()
                 tag = str(release.get("tag_name", ""))
                 available = _version_tuple(tag) > _version_tuple(DESKTOP_VERSION)
                 self.after(0, lambda: self._show_desktop_update(release) if available else (
@@ -1025,7 +932,7 @@ class InventoryApp(tk.Tk):
             except Exception as error:
                 if manual:
                     detail = str(error).strip() or repr(error).strip() or type(error).__name__
-                    message = f"Could not check the private GitHub release.\n\n{detail}"
+                    message = f"Could not check the public GitHub release.\n\n{detail}"
                     self.after(0, lambda message=message: messagebox.showerror("Update check failed", message, parent=self))
         threading.Thread(target=worker, daemon=True).start()
 
@@ -1044,12 +951,12 @@ class InventoryApp(tk.Tk):
             messagebox.showinfo("Update available", "The update was approved. Run the packaged InventoryTracker.exe to install the desktop update.", parent=self)
             return
         self.status.configure(text=f"Downloading Inventory Tracker {tag}…")
-        threading.Thread(target=self._download_and_apply_desktop_update, args=(asset, _read_github_token()), daemon=True).start()
+        threading.Thread(target=self._download_and_apply_desktop_update, args=(asset,), daemon=True).start()
 
-    def _download_and_apply_desktop_update(self, asset: dict, token: str):
+    def _download_and_apply_desktop_update(self, asset: dict):
         try:
             request = urllib.request.Request(asset.get("url", ""), headers={
-                "Accept": "application/octet-stream", "Authorization": f"Bearer {token}",
+                "Accept": "application/octet-stream",
                 "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "InventoryTracker",
             })
             with urllib.request.urlopen(request, timeout=90) as response:

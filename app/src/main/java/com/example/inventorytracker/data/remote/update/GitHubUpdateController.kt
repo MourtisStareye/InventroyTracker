@@ -13,12 +13,6 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
-import java.security.KeyStore
-import java.util.Base64
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
 
 data class GitHubRelease(
     val tag: String,
@@ -30,64 +24,20 @@ data class GitHubRelease(
 class GitHubUpdateController(private val context: Context) {
     private val client = OkHttpClient()
     private val repository = "MourtisStareye/InventroyTracker"
-    private val keyAlias = "inventory_tracker_github_token_key"
-
-    fun savedToken(): String = runCatching {
-        val stored = context.getSharedPreferences("github_update_access", Context.MODE_PRIVATE)
-            .getString("token", null) ?: return ""
-        val bytes = Base64.getDecoder().decode(stored)
-        val nonce = bytes.copyOfRange(0, 12)
-        val encrypted = bytes.copyOfRange(12, bytes.size)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, encryptionKey(), GCMParameterSpec(128, nonce))
-        String(cipher.doFinal(encrypted), Charsets.UTF_8)
-    }.getOrDefault("")
-
-    fun saveToken(token: String) {
-        if (token.isBlank()) return
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, encryptionKey())
-        val encrypted = cipher.iv + cipher.doFinal(token.trim().toByteArray(Charsets.UTF_8))
-        context.getSharedPreferences("github_update_access", Context.MODE_PRIVATE).edit()
-            .putString("token", Base64.getEncoder().encodeToString(encrypted)).apply()
-    }
-
-    fun clearToken() {
-        context.getSharedPreferences("github_update_access", Context.MODE_PRIVATE).edit().remove("token").apply()
-    }
-
-    private fun encryptionKey(): SecretKey {
-        val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
-        (store.getKey(keyAlias, null) as? SecretKey)?.let { return it }
-        val generator = KeyGenerator.getInstance("AES", "AndroidKeyStore")
-        generator.init(android.security.keystore.KeyGenParameterSpec.Builder(
-            keyAlias,
-            android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT
-        ).setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
-            .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
-            .setRandomizedEncryptionRequired(true)
-            .build())
-        return generator.generateKey()
-    }
 
     suspend fun checkForUpdate(): GitHubRelease? = withContext(Dispatchers.IO) {
-        val token = savedToken()
-        if (token.isBlank()) {
-            throw IllegalStateException("Enter and save a fine-grained GitHub token in Settings → Software updates. Private repositories require authentication.")
-        }
         val request = Request.Builder()
             .url("https://api.github.com/repos/$repository/releases/latest")
             .header("Accept", "application/vnd.github+json")
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "InventoryTracker-Android")
-            .header("Authorization", "Bearer $token")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 val message = when (response.code) {
-                    401 -> "GitHub rejected the token. Replace it with a valid, unexpired token that has Contents: read access."
-                    403 -> "GitHub denied release access. Check the token's repository selection and Contents: read permission, or retry later if rate-limited."
-                    404 -> "GitHub returned 404. Verify the repository name and token access, and publish a GitHub Release first. The updater checks Releases, not ordinary commits."
+                    401 -> "GitHub did not allow anonymous release access. Confirm the repository and its Releases are public."
+                    403 -> "GitHub temporarily denied the update check. Check the internet connection and try again later."
+                    404 -> "GitHub returned 404. Verify the public repository name and publish a GitHub Release first. The updater checks Releases, not ordinary commits."
                     else -> "GitHub release check failed with HTTP ${response.code}."
                 }
                 throw IllegalStateException(message)
@@ -129,7 +79,6 @@ class GitHubUpdateController(private val context: Context) {
             .header("Accept", "application/octet-stream")
             .header("X-GitHub-Api-Version", "2022-11-28")
             .header("User-Agent", "InventoryTracker-Android")
-            .header("Authorization", "Bearer ${savedToken()}")
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IllegalStateException("APK download failed (HTTP ${response.code}).")

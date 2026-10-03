@@ -98,9 +98,7 @@ fun InventoryAppNav(
     var launchUpdate by remember { mutableStateOf<GitHubRelease?>(null) }
 
     LaunchedEffect(updateController) {
-        if (updateController.savedToken().isNotBlank()) {
-            launchUpdate = runCatching { updateController.checkForUpdate() }.getOrNull()
-        }
+        launchUpdate = runCatching { updateController.checkForUpdate() }.getOrNull()
     }
 
     launchUpdate?.let { release ->

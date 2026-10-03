@@ -43,16 +43,12 @@ SYNC BUTTONS
 - The desktop app must be running for a sync to complete.
 
 SOFTWARE UPDATES FROM GITHUB
-The desktop and Android apps check the private repository's latest published GitHub Release when they start, after update access is configured. They show the version and release notes and wait for your approval before downloading. Android then opens Android's installer, which asks you to approve installation. Desktop closes, replaces its installed EXE, and reopens.
+The desktop and Android apps check the public repository's latest published GitHub Release when they start. No token or sign-in is required. They show the version and release notes and wait for your approval before downloading. Android then opens Android's installer, which asks you to approve installation. Desktop closes, replaces its installed EXE, and reopens.
 
-1. Create a fine-grained personal access token in GitHub, limited to the InventoryTracker repository and the Contents permission set to Read-only. Do not grant write access. Keep the token private.
-2. In the desktop app, open Settings > Software updates, paste the token, then press Save token. In the Android app, open Settings > Software updates, paste the same token, then press Save access. Each app encrypts its own copy locally; the token is not included in inventory sync or this ZIP.
-3. For each release, update desktop/inventory_desktop.py's DESKTOP_VERSION and app/build.gradle.kts's versionName and versionCode. Build the desktop EXE and Android APK, then publish a GitHub Release in MourtisStareye/InventroyTracker with a matching version tag (for example v1.2.0), release notes, and both assets: InventoryTracker.exe and app-debug.apk. The APK must be built and signed with the same Android signing key as the installed app.
-4. On the next launch, each app checks the latest release and offers it for approval. You can also select Check for updates in the app's Software updates settings.
-5. On Android, if prompted, allow Inventory Tracker to install unknown apps, return to Inventory Tracker, and check for the update again. Android will show its final install/update confirmation.
+1. Confirm MourtisStareye/InventroyTracker and its Releases are public. Anyone can download release assets from this public repository.
+2. For each release, update desktop/inventory_desktop.py's DESKTOP_VERSION and app/build.gradle.kts's versionName and versionCode. Build the desktop EXE and Android APK, then publish a GitHub Release with a higher version tag, release notes, and both assets named InventoryTracker.exe and app-debug.apk. The APK must use the same Android signing key as the installed app.
+3. The apps check the latest release on launch and offer a newer version for approval. You can also select Check for updates under Settings > Software updates.
+4. On Android, if prompted, allow Inventory Tracker to install unknown apps, return to Inventory Tracker, and check for the update again. Android will show its final install/update confirmation.
 
-Private repository updates require network access and a valid, unexpired token with read-only access. If GitHub reports an authorization error, renew the token and save it in both apps. Do not paste a token into release notes, source code, or a shared ZIP.
-
-TOKEN-FREE UPDATE OPTION
-GitHub does not allow anonymous access to private repository releases. To avoid entering a token, publish update releases in a public GitHub repository. The source repository can remain private by using a separate public, releases-only repository, but both apps must be rebuilt with that public repository configured as their update source. Anyone can download APKs and EXEs from a public release.
+The updater looks for published Releases, not ordinary commits. If the check returns 404, verify the repository name and publish a release with both assets. If you want to keep the source private, use a separate public releases-only repository and configure both apps to use it.
 
