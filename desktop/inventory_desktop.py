@@ -24,7 +24,7 @@ from dataclasses import asdict, dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from urllib.parse import urlencode
 
 import qrcode
@@ -34,7 +34,7 @@ APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "InventoryTracker"
 DB_PATH = APP_DIR / "inventory.sqlite3"
 FIELDS = ("id", "name", "barcode", "brand", "quantity", "category", "imageUrl", "location", "notes", "price", "expirationDate", "updatedAt", "version", "deleted")
 GITHUB_REPO = "MourtisStareye/InventroyTracker"
-DESKTOP_VERSION = "1.1.6"
+DESKTOP_VERSION = "1.1.7"
 
 
 def _github_latest_release() -> dict:
@@ -618,6 +618,25 @@ class InventoryApp(tk.Tk):
                 self._button(photo_controls, "Open", open_photo).pack(side="left", padx=(0, 5))
                 self._button(photo_controls, "Choose…", choose_photo).pack(side="left")
                 self._button(photo_controls, "Clear", lambda target=var: target.set("")).pack(side="left", padx=(5, 0))
+            elif key == "category":
+                var = tk.StringVar(value=str(row[key] if row and row[key] is not None else ""))
+                category_box = ttk.Combobox(form, textvariable=var, values=self.store.categories(), state="readonly")
+                category_box.grid(row=index, column=1, sticky="ew", pady=(7, 2), ipady=5)
+                vars[key] = var
+
+                def add_category(target=var, box=category_box):
+                    value = simpledialog.askstring("Add category", "New category name:", parent=dialog)
+                    if not value or not value.strip():
+                        return
+                    value = value.strip()
+                    values = list(box.cget("values"))
+                    existing = next((option for option in values if option.casefold() == value.casefold()), None)
+                    if existing is None:
+                        values.append(value)
+                        box.configure(values=values)
+                    target.set(existing or value)
+
+                self._button(form, "Add new…", add_category).grid(row=index, column=2, sticky="w", padx=(8, 0), pady=(7, 2))
             else:
                 var = tk.StringVar(value=str(row[key] if row and row[key] is not None else (1 if key == "quantity" else "")))
                 entry = tk.Entry(form, textvariable=var, font=("Segoe UI", 10), relief="solid", bd=1)

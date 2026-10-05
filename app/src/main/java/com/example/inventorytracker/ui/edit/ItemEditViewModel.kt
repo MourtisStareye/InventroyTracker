@@ -7,8 +7,11 @@ import com.example.inventorytracker.data.local.entity.InventoryItem
 import com.example.inventorytracker.data.repository.InventoryRepository
 import com.example.inventorytracker.ui.navigation.ItemEditKey
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ItemEditViewModel(
@@ -23,6 +26,13 @@ class ItemEditViewModel(
     val name = MutableStateFlow(editKey.initialName ?: "")
     val brand = MutableStateFlow(editKey.initialBrand ?: "")
     val category = MutableStateFlow(editKey.initialCategory ?: "")
+    val existingCategories: StateFlow<List<String>> = repository.getAllItems()
+        .map { items ->
+            items.mapNotNull { it.category?.trim()?.takeIf(String::isNotEmpty) }
+                .distinctBy { it.lowercase() }
+                .sortedBy { it.lowercase() }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val quantity = MutableStateFlow(1)
     val imageUrl = MutableStateFlow(editKey.initialImageUrl ?: "")
     val location = MutableStateFlow("")

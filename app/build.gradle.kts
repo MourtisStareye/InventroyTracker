@@ -15,8 +15,8 @@ android {
         applicationId = "com.example.inventorytracker"
         minSdk = 26
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.1.6"
+        versionCode = 9
+        versionName = "1.1.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

@@ -9,8 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,9 +43,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -96,7 +98,7 @@ private val CommonCategories = listOf(
     "Miscellaneous"
 )
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemEditScreen(
     viewModel: ItemEditViewModel,
@@ -111,6 +113,7 @@ fun ItemEditScreen(
     val name by viewModel.name.collectAsStateWithLifecycle()
     val brand by viewModel.brand.collectAsStateWithLifecycle()
     val category by viewModel.category.collectAsStateWithLifecycle()
+    val existingCategories by viewModel.existingCategories.collectAsStateWithLifecycle()
     val quantity by viewModel.quantity.collectAsStateWithLifecycle()
     val imageUrl by viewModel.imageUrl.collectAsStateWithLifecycle()
     val location by viewModel.location.collectAsStateWithLifecycle()
@@ -122,6 +125,9 @@ fun ItemEditScreen(
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     var photoError by remember { mutableStateOf<String?>(null) }
+    var categoryExpanded by remember { mutableStateOf(false) }
+    var showNewCategoryDialog by remember { mutableStateOf(false) }
+    var newCategoryName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val photoPicker = rememberLauncherForActivityResult(
@@ -171,6 +177,35 @@ fun ItemEditScreen(
 
     LaunchedEffect(openPhotoPickerOnLaunch) {
         if (openPhotoPickerOnLaunch && !isEditing) photoPicker.launch("image/*")
+    }
+
+    if (showNewCategoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewCategoryDialog = false },
+            title = { Text("Add new category") },
+            text = {
+                OutlinedTextField(
+                    value = newCategoryName,
+                    onValueChange = { newCategoryName = it },
+                    label = { Text("Category name") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val newCategory = newCategoryName.trim()
+                        if (newCategory.isNotEmpty()) {
+                            viewModel.updateCategory(newCategory)
+                            showNewCategoryDialog = false
+                        }
+                    }
+                ) { Text("Add") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewCategoryDialog = false }) { Text("Cancel") }
+            }
+        )
     }
 
     if (showDeleteDialog && isEditing) {
@@ -379,46 +414,49 @@ fun ItemEditScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
 
-                // Category Field + Suggestion Chips
-                Column {
+                val categoryOptions = (CommonCategories + existingCategories + category)
+                    .map(String::trim)
+                    .filter(String::isNotEmpty)
+                    .distinctBy { it.lowercase() }
+
+                ExposedDropdownMenuBox(
+                    expanded = categoryExpanded,
+                    onExpandedChange = { categoryExpanded = !categoryExpanded }
+                ) {
                     OutlinedTextField(
                         value = category,
-                        onValueChange = { viewModel.updateCategory(it) },
-                        modifier = Modifier.fillMaxWidth(),
+                        onValueChange = {},
+                        readOnly = true,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
                         label = { Text("Category") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Rounded.Category,
-                                contentDescription = null
-                            )
+                        leadingIcon = { Icon(Icons.Rounded.Category, contentDescription = null) },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
                         },
                         singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                        shape = RoundedCornerShape(16.dp)
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "Suggested Categories:",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ExposedDropdownMenu(
+                        expanded = categoryExpanded,
+                        onDismissRequest = { categoryExpanded = false }
                     ) {
-                        CommonCategories.forEach { suggested ->
-                            FilterChip(
-                                selected = category.equals(suggested, ignoreCase = true),
-                                onClick = { viewModel.updateCategory(suggested) },
-                                label = { Text(suggested) },
-                                shape = RoundedCornerShape(10.dp)
+                        categoryOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    viewModel.updateCategory(option)
+                                    categoryExpanded = false
+                                }
                             )
                         }
+                        DropdownMenuItem(
+                            text = { Text("Add new category…") },
+                            onClick = {
+                                categoryExpanded = false
+                                newCategoryName = ""
+                                showNewCategoryDialog = true
+                            }
+                        )
                     }
                 }
 
