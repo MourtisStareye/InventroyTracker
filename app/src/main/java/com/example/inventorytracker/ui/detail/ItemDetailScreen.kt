@@ -250,6 +250,16 @@ fun ItemDetailScreen(
                             )
                         }
 
+                        if (!currentItem.type.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Type: ${currentItem.type}",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.tertiary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
                         if (!currentItem.category.isNullOrBlank()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Surface(

@@ -32,9 +32,9 @@ import qrcode
 
 APP_DIR = Path(os.getenv("LOCALAPPDATA", Path.home())) / "InventoryTracker"
 DB_PATH = APP_DIR / "inventory.sqlite3"
-FIELDS = ("id", "name", "barcode", "brand", "quantity", "category", "imageUrl", "location", "notes", "price", "expirationDate", "updatedAt", "version", "deleted")
+FIELDS = ("id", "name", "barcode", "brand", "quantity", "category", "type", "imageUrl", "location", "notes", "price", "expirationDate", "updatedAt", "version", "deleted")
 GITHUB_REPO = "MourtisStareye/InventroyTracker"
-DESKTOP_VERSION = "1.1.7"
+DESKTOP_VERSION = "1.1.8"
 
 
 def _github_latest_release() -> dict:
@@ -117,7 +117,7 @@ class InventoryStore:
         self.db.executescript("""
           CREATE TABLE IF NOT EXISTS items (
             id TEXT PRIMARY KEY, name TEXT NOT NULL, barcode TEXT, brand TEXT, quantity INTEGER NOT NULL DEFAULT 1,
-            category TEXT, imageUrl TEXT, location TEXT, notes TEXT, price REAL, expirationDate INTEGER,
+            category TEXT, type TEXT, imageUrl TEXT, location TEXT, notes TEXT, price REAL, expirationDate INTEGER,
             updatedAt INTEGER NOT NULL, version INTEGER NOT NULL DEFAULT 0, deleted INTEGER NOT NULL DEFAULT 0,
             originDevice TEXT NOT NULL DEFAULT 'desktop', localImagePath TEXT);
           CREATE INDEX IF NOT EXISTS items_barcode ON items(barcode);
@@ -127,6 +127,8 @@ class InventoryStore:
         columns = {row[1] for row in self.db.execute("PRAGMA table_info(items)")}
         if "localImagePath" not in columns:
             self.db.execute("ALTER TABLE items ADD COLUMN localImagePath TEXT")
+        if "type" not in columns:
+            self.db.execute("ALTER TABLE items ADD COLUMN type TEXT")
         self.db.commit()
         if not self.setting("token"):
             self.set_setting("token", secrets.token_urlsafe(24))
@@ -160,9 +162,9 @@ class InventoryStore:
             sql = "SELECT * FROM items WHERE deleted=0"
             args: list[object] = []
             if query.strip():
-                sql += " AND (name LIKE ? OR barcode LIKE ? OR brand LIKE ? OR category LIKE ? OR location LIKE ?)"
+                sql += " AND (name LIKE ? OR barcode LIKE ? OR brand LIKE ? OR category LIKE ? OR type LIKE ? OR location LIKE ?)"
                 term = f"%{query.strip()}%"
-                args.extend([term] * 5)
+                args.extend([term] * 6)
             if category != "All":
                 sql += " AND category=?"
                 args.append(category)
@@ -170,6 +172,53 @@ class InventoryStore:
 
     def categories(self) -> list[str]:
         return [row[0] for row in self.db.execute("SELECT DISTINCT category FROM items WHERE deleted=0 AND category IS NOT NULL AND category<>'' ORDER BY category COLLATE NOCASE")]
+
+    def types(self) -> list[str]:
+        return [row[0] for row in self.db.execute("SELECT DISTINCT type FROM items WHERE deleted=0 AND type IS NOT NULL AND type<>'' ORDER BY type COLLATE NOCASE")]
+
+    def _change_category(self, old_category: str, new_category: str | None) -> int:
+        rows = self.db.execute(
+            "SELECT * FROM items WHERE deleted=0 AND lower(trim(category))=lower(trim(?))",
+            (old_category.strip(),),
+        ).fetchall()
+        with self.lock, self.db:
+            for row in rows:
+                record = {key: row[key] for key in FIELDS}
+                record["localImagePath"] = row["localImagePath"]
+                record["category"] = new_category
+                record["updatedAt"] = now_ms()
+                record["version"] = int(row["version"]) + 1
+                record["originDevice"] = "desktop"
+                self._write_record(record)
+        return len(rows)
+
+    def rename_category(self, old_category: str, new_category: str) -> int:
+        return self._change_category(old_category, new_category.strip())
+
+    def delete_category(self, category: str) -> int:
+        return self._change_category(category, None)
+
+    def _change_type(self, old_type: str, new_type: str | None) -> int:
+        rows = self.db.execute(
+            "SELECT * FROM items WHERE deleted=0 AND lower(trim(type))=lower(trim(?))",
+            (old_type.strip(),),
+        ).fetchall()
+        with self.lock, self.db:
+            for row in rows:
+                record = {key: row[key] for key in FIELDS}
+                record["localImagePath"] = row["localImagePath"]
+                record["type"] = new_type
+                record["updatedAt"] = now_ms()
+                record["version"] = int(row["version"]) + 1
+                record["originDevice"] = "desktop"
+                self._write_record(record)
+        return len(rows)
+
+    def rename_type(self, old_type: str, new_type: str) -> int:
+        return self._change_type(old_type, new_type.strip())
+
+    def delete_type(self, item_type: str) -> int:
+        return self._change_type(item_type, None)
 
     def data_version(self) -> int:
         with self.lock:
@@ -188,7 +237,7 @@ class InventoryStore:
         existing = self.db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone() if item_id else None
         row_id = item_id or str(uuid.uuid4())
         updated = {"id": row_id, "name": name, "barcode": _none(data.get("barcode")), "brand": _none(data.get("brand")), "quantity": qty,
-                  "category": _none(data.get("category")), "imageUrl": _none(data.get("imageUrl")), "location": _none(data.get("location")),
+                  "category": _none(data.get("category")), "type": _none(data.get("type")), "imageUrl": _none(data.get("imageUrl")), "location": _none(data.get("location")),
                   "notes": _none(data.get("notes")), "price": price, "expirationDate": _none_int(data.get("expirationDate")),
                   "updatedAt": now_ms(), "version": (int(existing["version"]) + 1 if existing else 1), "deleted": 0, "originDevice": "desktop"}
         with self.lock, self.db:
@@ -267,9 +316,9 @@ class InventoryStore:
         if record.get("imageUrl") == f"inventory-photo://{record['id']}":
             local_photo = str(self.photo_path(record["id"]))
         values = [record.get(k) for k in FIELDS] + [record.get("originDevice", "desktop"), local_photo]
-        self.db.execute("""INSERT INTO items(id,name,barcode,brand,quantity,category,imageUrl,location,notes,price,expirationDate,updatedAt,version,deleted,originDevice,localImagePath)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
-          name=excluded.name,barcode=excluded.barcode,brand=excluded.brand,quantity=excluded.quantity,category=excluded.category,imageUrl=excluded.imageUrl,
+        self.db.execute("""INSERT INTO items(id,name,barcode,brand,quantity,category,type,imageUrl,location,notes,price,expirationDate,updatedAt,version,deleted,originDevice,localImagePath)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
+          name=excluded.name,barcode=excluded.barcode,brand=excluded.brand,quantity=excluded.quantity,category=excluded.category,type=excluded.type,imageUrl=excluded.imageUrl,
           location=excluded.location,notes=excluded.notes,price=excluded.price,expirationDate=excluded.expirationDate,updatedAt=excluded.updatedAt,
           version=excluded.version,deleted=excluded.deleted,originDevice=excluded.originDevice,localImagePath=excluded.localImagePath""", values)
         self.db.execute("INSERT INTO changes(id) VALUES(?)", (record["id"],))
@@ -299,7 +348,7 @@ def _validate_record(record) -> dict:
     if any(key not in record for key in required):
         raise ValueError("A change is missing required fields.")
     return {"id": str(record["id"]), "name": str(record["name"]).strip(), "barcode": record.get("barcode"), "brand": record.get("brand"),
-            "quantity": max(0, int(record["quantity"])), "category": record.get("category"), "imageUrl": record.get("imageUrl"),
+            "quantity": max(0, int(record["quantity"])), "category": record.get("category"), "type": record.get("type"), "imageUrl": record.get("imageUrl"),
             "location": record.get("location"), "notes": record.get("notes"), "price": record.get("price"),
             "expirationDate": record.get("expirationDate"), "updatedAt": int(record["updatedAt"]), "version": int(record["version"]),
             "deleted": 1 if record["deleted"] else 0, "originDevice": ""}
@@ -485,13 +534,14 @@ class InventoryApp(tk.Tk):
 
         card = tk.Frame(body, bg=self.PANEL, highlightbackground="#e3eae5", highlightthickness=1)
         card.pack(fill="both", expand=True)
-        columns = ("name", "category", "location", "quantity", "price")
+        columns = ("name", "category", "type", "location", "quantity", "price")
         self.table = ttk.Treeview(card, columns=columns, show="headings", selectmode="browse")
-        headings = (("name", "ITEM"), ("category", "CATEGORY"), ("location", "LOCATION"), ("quantity", "QTY"), ("price", "PRICE"))
+        headings = (("name", "ITEM"), ("category", "CATEGORY"), ("type", "TYPE"), ("location", "LOCATION"), ("quantity", "QTY"), ("price", "PRICE"))
         for key, title in headings:
             self.table.heading(key, text=title)
         self.table.column("name", width=240, anchor="w")
         self.table.column("category", width=140, anchor="w")
+        self.table.column("type", width=120, anchor="w")
         self.table.column("location", width=170, anchor="w")
         self.table.column("quantity", width=70, anchor="center")
         self.table.column("price", width=90, anchor="e")
@@ -527,7 +577,7 @@ class InventoryApp(tk.Tk):
         self.table.delete(*self.table.get_children())
         for row in rows:
             price = f"${row['price']:.2f}" if row["price"] is not None else "—"
-            self.table.insert("", "end", iid=row["id"], values=(row["name"], row["category"] or "—", row["location"] or "—", row["quantity"], price))
+            self.table.insert("", "end", iid=row["id"], values=(row["name"], row["category"] or "—", row["type"] or "—", row["location"] or "—", row["quantity"], price))
         total = sum(int(row["quantity"]) for row in self.store.list_items())
         self.count_label.configure(text=f"{len(self.store.list_items())} items  ·  {total} total units")
 
@@ -568,7 +618,7 @@ class InventoryApp(tk.Tk):
                 self._edit_dialog(row)
 
     def _edit_dialog(self, row=None):
-        fields = [("name", "Item name *"), ("barcode", "Barcode / UPC"), ("brand", "Brand"), ("category", "Category"), ("quantity", "Quantity"),
+        fields = [("name", "Item name *"), ("barcode", "Barcode / UPC"), ("brand", "Brand"), ("category", "Category"), ("type", "Type"), ("quantity", "Quantity"),
                   ("price", "Price"), ("location", "Location"), ("imageUrl", "Image URL"), ("localImagePath", "Local photo"),
                   ("expirationDate", "Expiration date (Unix ms, optional)"), ("notes", "Notes")]
         dialog = tk.Toplevel(self)
@@ -618,23 +668,32 @@ class InventoryApp(tk.Tk):
                 self._button(photo_controls, "Open", open_photo).pack(side="left", padx=(0, 5))
                 self._button(photo_controls, "Choose…", choose_photo).pack(side="left")
                 self._button(photo_controls, "Clear", lambda target=var: target.set("")).pack(side="left", padx=(5, 0))
-            elif key == "category":
+            elif key in ("category", "type"):
                 var = tk.StringVar(value=str(row[key] if row and row[key] is not None else ""))
-                category_box = ttk.Combobox(form, textvariable=var, values=self.store.categories(), state="readonly")
+                is_type = key == "type"
+                value_values = self.store.types() if is_type else self.store.categories()
+                label = "type" if is_type else "category"
+                title = "Type" if is_type else "Category"
+                category_box = ttk.Combobox(form, textvariable=var, values=value_values, state="normal")
                 category_box.grid(row=index, column=1, sticky="ew", pady=(7, 2), ipady=5)
                 vars[key] = var
 
-                def add_category(target=var, box=category_box):
-                    value = simpledialog.askstring("Add category", "New category name:", parent=dialog)
+                def filter_categories(_event, box=category_box, options=value_values):
+                    query = box.get().strip().casefold()
+                    matches = [option for option in options if query in option.casefold()]
+                    box.configure(values=matches)
+
+                category_box.bind("<KeyRelease>", filter_categories)
+                category_box.bind("<FocusIn>", lambda _event, box=category_box, options=value_values: box.configure(values=options))
+
+                def add_category(target=var, box=category_box, options=value_values, item_type=is_type, field_title=title):
+                    value = simpledialog.askstring(f"Add {field_title.lower()}", f"New {field_title.lower()} name:", parent=dialog)
                     if not value or not value.strip():
                         return
                     value = value.strip()
-                    values = list(box.cget("values"))
-                    existing = next((option for option in values if option.casefold() == value.casefold()), None)
-                    if existing is None:
-                        values.append(value)
-                        box.configure(values=values)
+                    existing = next((option for option in options if option.casefold() == value.casefold()), None)
                     target.set(existing or value)
+                    box.configure(values=options)
 
                 self._button(form, "Add new…", add_category).grid(row=index, column=2, sticky="w", padx=(8, 0), pady=(7, 2))
             else:
@@ -916,6 +975,18 @@ class InventoryApp(tk.Tk):
 
         self._button(sync_frame, "LAN sync settings", open_lan_sync_settings).pack(anchor="w")
 
+        category_frame = tk.Frame(dialog, bg="#f4f7f3", padx=16, pady=14)
+        category_frame.pack(fill="x", padx=24, pady=10)
+        tk.Label(category_frame, text="Categories", bg="#f4f7f3", fg=self.INK, font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        tk.Label(category_frame, text="Rename or remove categories used in the add-item picklist.", bg="#f4f7f3", fg=self.MUTED, font=("Segoe UI", 9), wraplength=390, justify="left").pack(anchor="w", pady=(5, 10))
+        self._button(category_frame, "Manage categories", lambda: self.open_category_settings(dialog)).pack(anchor="w")
+
+        type_frame = tk.Frame(dialog, bg="#f4f7f3", padx=16, pady=14)
+        type_frame.pack(fill="x", padx=24, pady=10)
+        tk.Label(type_frame, text="Types", bg="#f4f7f3", fg=self.INK, font=("Segoe UI", 11, "bold")).pack(anchor="w")
+        tk.Label(type_frame, text="Rename or remove types used in the add-item picklist.", bg="#f4f7f3", fg=self.MUTED, font=("Segoe UI", 9), wraplength=390, justify="left").pack(anchor="w", pady=(5, 10))
+        self._button(type_frame, "Manage types", lambda: self.open_category_settings(dialog, "type")).pack(anchor="w")
+
         update_frame = tk.Frame(dialog, bg="#f4f7f3", padx=16, pady=14)
         update_frame.pack(fill="x", padx=24, pady=10)
         tk.Label(update_frame, text="Software updates", bg="#f4f7f3", fg=self.INK, font=("Segoe UI", 11, "bold")).pack(anchor="w")
@@ -939,6 +1010,86 @@ class InventoryApp(tk.Tk):
 
         self._button(clear_frame, "Clear all inventory", clear_inventory).pack(anchor="w")
         self._button(dialog, "Done", dialog.destroy).pack(anchor="e", padx=24, pady=(8, 20))
+
+    def open_category_settings(self, parent=None, field="category"):
+        is_type = field == "type"
+        plural = "types" if is_type else "categories"
+        singular = "type" if is_type else "category"
+        values_getter = self.store.types if is_type else self.store.categories
+        rename_value = self.store.rename_type if is_type else self.store.rename_category
+        delete_value = self.store.delete_type if is_type else self.store.delete_category
+        dialog = tk.Toplevel(self)
+        dialog.title(f"Manage {plural}")
+        dialog.configure(bg=self.PANEL)
+        dialog.transient(parent or self)
+        dialog.grab_set()
+        dialog.resizable(True, True)
+        dialog.minsize(420, 320)
+        tk.Label(dialog, text=f"Manage {plural}", bg=self.PANEL, fg=self.INK, font=("Segoe UI", 16, "bold")).pack(anchor="w", padx=20, pady=(18, 5))
+        tk.Label(dialog, text=f"Renaming updates matching inventory items. Deleting clears their {singular} and syncs the change.", bg=self.PANEL, fg=self.MUTED, font=("Segoe UI", 9), wraplength=380, justify="left").pack(anchor="w", padx=20, pady=(0, 12))
+        listing = ttk.Treeview(dialog, columns=(singular,), show="headings", height=8)
+        listing.heading(singular, text=singular.upper())
+        listing.column(singular, anchor="w", width=340)
+        listing.pack(fill="both", expand=True, padx=20, pady=(0, 10))
+        search_var = tk.StringVar()
+        search = tk.Entry(dialog, textvariable=search_var, font=("Segoe UI", 10), relief="solid", bd=1)
+        search.insert(0, f"Search {plural}…")
+        search.pack(fill="x", padx=20, pady=(0, 10), ipady=6)
+        search.bind("<FocusIn>", lambda _event: search.delete(0, "end") if search.get() == f"Search {plural}…" else None)
+
+        def refresh_values(select=None):
+            listing.delete(*listing.get_children())
+            query = search_var.get().strip().casefold()
+            if query == f"search {plural}…":
+                query = ""
+            for value in values_getter():
+                if query and query not in value.casefold():
+                    continue
+                listing.insert("", "end", iid=value, values=(value,))
+            if select in listing.get_children():
+                listing.selection_set(select)
+
+        def selected_value():
+            selection = listing.selection()
+            return selection[0] if selection else None
+
+        def rename_selected():
+            current = selected_value()
+            if not current:
+                messagebox.showinfo(f"Select a {singular}", f"Choose a {singular} to rename.", parent=dialog)
+                return
+            renamed = simpledialog.askstring(f"Rename {singular}", f"New {singular} name:", initialvalue=current, parent=dialog)
+            if renamed is None:
+                return
+            renamed = renamed.strip()
+            if not renamed:
+                messagebox.showerror(f"Invalid {singular}", f"{singular.capitalize()} name cannot be empty.", parent=dialog)
+                return
+            count = rename_value(current, renamed)
+            refresh_values(renamed)
+            self.refresh()
+            self.status.configure(text=f"Renamed {singular} in {count} items")
+
+        def delete_selected():
+            current = selected_value()
+            if not current:
+                messagebox.showinfo(f"Select a {singular}", f"Choose a {singular} to delete.", parent=dialog)
+                return
+            if not messagebox.askyesno(f"Delete {singular}?", f"Remove ‘{current}’ from the picklist and clear it from matching items?", parent=dialog):
+                return
+            count = delete_value(current)
+            refresh_values()
+            self.refresh()
+            self.status.configure(text=f"Cleared {singular} from {count} items")
+
+        buttons = tk.Frame(dialog, bg=self.PANEL)
+        buttons.pack(fill="x", padx=20, pady=(0, 16))
+        self._button(buttons, "Rename", rename_selected).pack(side="left")
+        self._button(buttons, "Delete", delete_selected).pack(side="left", padx=8)
+        self._button(buttons, "Done", dialog.destroy).pack(side="right")
+        search_var.trace_add("write", lambda *_args: refresh_values())
+        search.bind("<KeyRelease>", lambda _event: refresh_values())
+        refresh_values()
 
     def _check_desktop_update_on_launch(self):
         self._check_desktop_update(manual=False)

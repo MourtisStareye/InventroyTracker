@@ -11,6 +11,7 @@ data class SyncRecord(
     val brand: String?,
     val quantity: Int,
     val category: String?,
+    val type: String? = null,
     val imageUrl: String?,
     val location: String?,
     val notes: String?,

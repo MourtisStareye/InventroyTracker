@@ -51,7 +51,7 @@ Version 1.1.4 improves the Windows self-updater by staging the new executable be
 
 Version 1.1.5 removes the barcode from both inventory list screens. Barcode values remain part of item records and can still be used for scanning and item management.
 
-Version 1.1.7 adds category picklists to every inventory entry method in both apps, including support for existing and user-added categories. Version 1.1.6 introduced separate UPC scanning, QR scanning, photo upload, and manual-entry options on Android.
+Version 1.1.8 adds a searchable Type field to both apps, including type picklists, Settings management, and phone/desktop sync support. Categories and Types can be searched, renamed, and deleted in Settings; renames and deletions update matching inventory items and sync changes. Version 1.1.7 added category picklists to every inventory entry method, and Version 1.1.6 introduced separate UPC scanning, QR scanning, photo upload, and manual-entry options on Android.
 
 1. Confirm MourtisStareye/InventroyTracker and its Releases are public. Anyone can download release assets from this public repository.
 2. For each release, update desktop/inventory_desktop.py's DESKTOP_VERSION and app/build.gradle.kts's versionName and versionCode. Build the desktop EXE and Android APK, then publish a GitHub Release with a higher version tag, release notes, and both assets named InventoryTracker.exe and app-debug.apk. The APK must use the same Android signing key as the installed app.

@@ -170,6 +170,19 @@ fun InventoryItemCard(
                             }
                         }
                     }
+                    item.type?.takeIf { it.isNotBlank() }?.let { itemType ->
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.tertiaryContainer
+                        ) {
+                            Text(
+                                text = itemType,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
 
                 }
             }

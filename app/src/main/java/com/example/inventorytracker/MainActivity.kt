@@ -204,7 +204,8 @@ fun InventoryAppNav(
                 AppSettingsScreen(
                     onBack = { backStack.removeLastOrNull() },
                     onLanSyncSettings = { backStack.add(SyncSettingsKey) },
-                    updateController = updateController
+                    updateController = updateController,
+                    repository = repository
                 )
             }
 

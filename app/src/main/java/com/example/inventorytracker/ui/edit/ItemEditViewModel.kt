@@ -26,9 +26,17 @@ class ItemEditViewModel(
     val name = MutableStateFlow(editKey.initialName ?: "")
     val brand = MutableStateFlow(editKey.initialBrand ?: "")
     val category = MutableStateFlow(editKey.initialCategory ?: "")
+    val type = MutableStateFlow("")
     val existingCategories: StateFlow<List<String>> = repository.getAllItems()
         .map { items ->
             items.mapNotNull { it.category?.trim()?.takeIf(String::isNotEmpty) }
+                .distinctBy { it.lowercase() }
+                .sortedBy { it.lowercase() }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val existingTypes: StateFlow<List<String>> = repository.getAllItems()
+        .map { items ->
+            items.mapNotNull { it.type?.trim()?.takeIf(String::isNotEmpty) }
                 .distinctBy { it.lowercase() }
                 .sortedBy { it.lowercase() }
         }
@@ -62,6 +70,7 @@ class ItemEditViewModel(
                     name.value = item.name
                     brand.value = item.brand ?: ""
                     category.value = item.category ?: ""
+                    type.value = item.type ?: ""
                     quantity.value = item.quantity
                     imageUrl.value = item.imageUrl ?: ""
                     location.value = item.location ?: ""
@@ -93,6 +102,10 @@ class ItemEditViewModel(
 
     fun updateCategory(newCategory: String) {
         category.value = newCategory
+    }
+
+    fun updateType(newType: String) {
+        type.value = newType
     }
 
     fun updateQuantity(delta: Int) {
@@ -133,6 +146,7 @@ class ItemEditViewModel(
             barcode = barcode.value.trim().takeIf { it.isNotEmpty() },
             brand = brand.value.trim().takeIf { it.isNotEmpty() },
             category = category.value.trim().takeIf { it.isNotEmpty() },
+            type = type.value.trim().takeIf { it.isNotEmpty() },
             quantity = quantity.value,
             imageUrl = imageUrl.value.trim().takeIf { it.isNotEmpty() },
             location = location.value.trim().takeIf { it.isNotEmpty() },

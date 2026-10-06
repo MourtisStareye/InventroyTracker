@@ -43,6 +43,7 @@ Header: `Authorization: Bearer <pairing-token>`
       "brand": "MakerCo",
       "quantity": 2,
       "category": "Crafts",
+      "type": "Materials",
       "imageUrl": null,
       "location": "Shelf A",
       "notes": null,

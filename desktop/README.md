@@ -40,7 +40,7 @@ The desktop app must remain open for phone syncs to reach it. In **Settings**, *
 
 ## Desktop features
 
-- Search by name, barcode, brand, category, or location; filter by category.
+- Search by name, barcode, brand, category, type, or location; filter by category.
 - Add, edit, delete, and adjust quantities for inventory items.
 - Upload local inventory photos, with the filename used to prefill the item name.
 - Persist items and sync state locally in SQLite.

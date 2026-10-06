@@ -203,6 +203,7 @@ class LanSyncController(
         brand = brand,
         quantity = quantity,
         category = category,
+        type = type,
         imageUrl = imageUrl?.let { value ->
             if (localPhotoFile(value) != null) desktopPhotoReference(syncId) else value
         },
@@ -222,6 +223,7 @@ class LanSyncController(
         brand = brand,
         quantity = quantity,
         category = category,
+        type = type,
         imageUrl = resolvedImageUrl,
         location = location,
         notes = notes,

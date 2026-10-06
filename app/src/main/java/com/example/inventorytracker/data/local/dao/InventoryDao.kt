@@ -60,12 +60,24 @@ interface InventoryDao {
     @Query("UPDATE inventory_items SET isDeleted = 1, syncPending = 1, lastUpdated = :updatedAt WHERE isDeleted = 0 AND isCatalogItem = 0")
     suspend fun clearInventory(updatedAt: Long): Int
 
+    @Query("UPDATE inventory_items SET category = :newCategory, syncPending = 1, lastUpdated = :updatedAt WHERE isDeleted = 0 AND isCatalogItem = 0 AND lower(trim(category)) = lower(trim(:oldCategory))")
+    suspend fun renameCategory(oldCategory: String, newCategory: String, updatedAt: Long): Int
+
+    @Query("UPDATE inventory_items SET category = NULL, syncPending = 1, lastUpdated = :updatedAt WHERE isDeleted = 0 AND isCatalogItem = 0 AND lower(trim(category)) = lower(trim(:category))")
+    suspend fun deleteCategory(category: String, updatedAt: Long): Int
+
+    @Query("UPDATE inventory_items SET type = :newType, syncPending = 1, lastUpdated = :updatedAt WHERE isDeleted = 0 AND isCatalogItem = 0 AND lower(trim(type)) = lower(trim(:oldType))")
+    suspend fun renameType(oldType: String, newType: String, updatedAt: Long): Int
+
+    @Query("UPDATE inventory_items SET type = NULL, syncPending = 1, lastUpdated = :updatedAt WHERE isDeleted = 0 AND isCatalogItem = 0 AND lower(trim(type)) = lower(trim(:type))")
+    suspend fun deleteType(type: String, updatedAt: Long): Int
+
     @Delete
     suspend fun deleteItem(item: InventoryItem)
 
     @Query("DELETE FROM inventory_items WHERE id = :id")
     suspend fun deleteItemById(id: Long)
 
-    @Query("SELECT * FROM inventory_items WHERE isDeleted = 0 AND isCatalogItem = 0 AND (name LIKE '%' || :query || '%' OR barcode LIKE '%' || :query || '%' OR category LIKE '%' || :query || '%' OR brand LIKE '%' || :query || '%') ORDER BY lastUpdated DESC")
+    @Query("SELECT * FROM inventory_items WHERE isDeleted = 0 AND isCatalogItem = 0 AND (name LIKE '%' || :query || '%' OR barcode LIKE '%' || :query || '%' OR category LIKE '%' || :query || '%' OR type LIKE '%' || :query || '%' OR brand LIKE '%' || :query || '%') ORDER BY lastUpdated DESC")
     fun searchItems(query: String): Flow<List<InventoryItem>>
 }

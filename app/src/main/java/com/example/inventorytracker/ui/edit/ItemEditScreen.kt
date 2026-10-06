@@ -85,19 +85,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private val CommonCategories = listOf(
-    "Groceries",
-    "Pantry",
-    "Beverages",
-    "Electronics",
-    "Household",
-    "Personal Care",
-    "Office Supplies",
-    "Books",
-    "Clothing",
-    "Miscellaneous"
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ItemEditScreen(
@@ -114,6 +101,8 @@ fun ItemEditScreen(
     val brand by viewModel.brand.collectAsStateWithLifecycle()
     val category by viewModel.category.collectAsStateWithLifecycle()
     val existingCategories by viewModel.existingCategories.collectAsStateWithLifecycle()
+    val type by viewModel.type.collectAsStateWithLifecycle()
+    val existingTypes by viewModel.existingTypes.collectAsStateWithLifecycle()
     val quantity by viewModel.quantity.collectAsStateWithLifecycle()
     val imageUrl by viewModel.imageUrl.collectAsStateWithLifecycle()
     val location by viewModel.location.collectAsStateWithLifecycle()
@@ -126,8 +115,11 @@ fun ItemEditScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var photoError by remember { mutableStateOf<String?>(null) }
     var categoryExpanded by remember { mutableStateOf(false) }
+    var typeExpanded by remember { mutableStateOf(false) }
     var showNewCategoryDialog by remember { mutableStateOf(false) }
     var newCategoryName by remember { mutableStateOf("") }
+    var showNewTypeDialog by remember { mutableStateOf(false) }
+    var newTypeName by remember { mutableStateOf("") }
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val photoPicker = rememberLauncherForActivityResult(
@@ -205,6 +197,31 @@ fun ItemEditScreen(
             dismissButton = {
                 TextButton(onClick = { showNewCategoryDialog = false }) { Text("Cancel") }
             }
+        )
+    }
+
+    if (showNewTypeDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewTypeDialog = false },
+            title = { Text("Add new type") },
+            text = {
+                OutlinedTextField(
+                    value = newTypeName,
+                    onValueChange = { newTypeName = it },
+                    label = { Text("Type name") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val newType = newTypeName.trim()
+                    if (newType.isNotEmpty()) {
+                        viewModel.updateType(newType)
+                        showNewTypeDialog = false
+                    }
+                }) { Text("Add") }
+            },
+            dismissButton = { TextButton(onClick = { showNewTypeDialog = false }) { Text("Cancel") } }
         )
     }
 
@@ -414,10 +431,11 @@ fun ItemEditScreen(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
                 )
 
-                val categoryOptions = (CommonCategories + existingCategories + category)
+                val categoryOptions = existingCategories
                     .map(String::trim)
                     .filter(String::isNotEmpty)
                     .distinctBy { it.lowercase() }
+                    .filter { category.isBlank() || it.contains(category.trim(), ignoreCase = true) }
 
                 ExposedDropdownMenuBox(
                     expanded = categoryExpanded,
@@ -425,8 +443,11 @@ fun ItemEditScreen(
                 ) {
                     OutlinedTextField(
                         value = category,
-                        onValueChange = {},
-                        readOnly = true,
+                        onValueChange = {
+                            viewModel.updateCategory(it)
+                            categoryExpanded = true
+                        },
+                        readOnly = false,
                         modifier = Modifier.fillMaxWidth().menuAnchor(),
                         label = { Text("Category") },
                         leadingIcon = { Icon(Icons.Rounded.Category, contentDescription = null) },
@@ -440,6 +461,13 @@ fun ItemEditScreen(
                         expanded = categoryExpanded,
                         onDismissRequest = { categoryExpanded = false }
                     ) {
+                        if (categoryOptions.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("No matching categories") },
+                                enabled = false,
+                                onClick = {}
+                            )
+                        }
                         categoryOptions.forEach { option ->
                             DropdownMenuItem(
                                 text = { Text(option) },
@@ -449,12 +477,78 @@ fun ItemEditScreen(
                                 }
                             )
                         }
+                        if (category.isNotBlank() && categoryOptions.none { it.equals(category.trim(), ignoreCase = true) }) {
+                            DropdownMenuItem(
+                                text = { Text("Add ‘${category.trim()}’ as a new category…") },
+                                onClick = {
+                                    newCategoryName = category.trim()
+                                    categoryExpanded = false
+                                    showNewCategoryDialog = true
+                                }
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = { Text("Add new category…") },
+                                onClick = {
+                                    categoryExpanded = false
+                                    newCategoryName = ""
+                                    showNewCategoryDialog = true
+                                }
+                            )
+                        }
+                    }
+                }
+
+                val typeOptions = existingTypes
+                    .map(String::trim)
+                    .filter(String::isNotEmpty)
+                    .distinctBy { it.lowercase() }
+                    .filter { type.isBlank() || it.contains(type.trim(), ignoreCase = true) }
+
+                ExposedDropdownMenuBox(
+                    expanded = typeExpanded,
+                    onExpandedChange = { typeExpanded = !typeExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = type,
+                        onValueChange = {
+                            viewModel.updateType(it)
+                            typeExpanded = true
+                        },
+                        readOnly = false,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        label = { Text("Type") },
+                        leadingIcon = { Icon(Icons.Rounded.Category, contentDescription = null) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = typeExpanded,
+                        onDismissRequest = { typeExpanded = false }
+                    ) {
+                        if (typeOptions.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("No matching types") },
+                                enabled = false,
+                                onClick = {}
+                            )
+                        }
+                        typeOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    viewModel.updateType(option)
+                                    typeExpanded = false
+                                }
+                            )
+                        }
                         DropdownMenuItem(
-                            text = { Text("Add new category…") },
+                            text = { Text(if (type.isNotBlank() && typeOptions.none { it.equals(type.trim(), ignoreCase = true) }) "Add ‘${type.trim()}’ as a new type…" else "Add new type…") },
                             onClick = {
-                                categoryExpanded = false
-                                newCategoryName = ""
-                                showNewCategoryDialog = true
+                                newTypeName = type.trim()
+                                typeExpanded = false
+                                showNewTypeDialog = true
                             }
                         )
                     }

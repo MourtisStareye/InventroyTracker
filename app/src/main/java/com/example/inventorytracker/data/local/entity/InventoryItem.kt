@@ -18,6 +18,7 @@ data class InventoryItem(
     val brand: String? = null,
     val quantity: Int = 1,
     val category: String? = null,
+    val type: String? = null,
     val imageUrl: String? = null,
     val location: String? = null,
     val notes: String? = null,

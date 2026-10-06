@@ -17,6 +17,10 @@ interface InventoryRepository {
     suspend fun deleteItem(item: InventoryItem)
     suspend fun deleteItemById(id: Long)
     suspend fun clearInventory()
+    suspend fun renameCategory(oldCategory: String, newCategory: String)
+    suspend fun deleteCategory(category: String)
+    suspend fun renameType(oldType: String, newType: String)
+    suspend fun deleteType(type: String)
     fun searchItems(query: String): Flow<List<InventoryItem>>
 }
 
@@ -136,6 +140,22 @@ class InventoryRepositoryImpl(
 
     override suspend fun clearInventory() {
         inventoryDao.clearInventory(System.currentTimeMillis())
+    }
+
+    override suspend fun renameCategory(oldCategory: String, newCategory: String) {
+        inventoryDao.renameCategory(oldCategory.trim(), newCategory.trim(), System.currentTimeMillis())
+    }
+
+    override suspend fun deleteCategory(category: String) {
+        inventoryDao.deleteCategory(category.trim(), System.currentTimeMillis())
+    }
+
+    override suspend fun renameType(oldType: String, newType: String) {
+        inventoryDao.renameType(oldType.trim(), newType.trim(), System.currentTimeMillis())
+    }
+
+    override suspend fun deleteType(type: String) {
+        inventoryDao.deleteType(type.trim(), System.currentTimeMillis())
     }
 
     override fun searchItems(query: String): Flow<List<InventoryItem>> {
